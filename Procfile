@@ -1,1 +1,1 @@
-web: cd src && uvicorn main:app --port process.env.PORT
+web: cd src && uvicorn main:app
