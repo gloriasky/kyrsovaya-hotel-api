@@ -1,1 +1,1 @@
-web: cd src && uvicorn main:app
+web: cd src && uvicorn main:app --port 80
