@@ -1,1 +1,1 @@
-web: cd src && uvicorn main:app --reload
+web: cd src && uvicorn main:app --reload -p process.env.PORT
