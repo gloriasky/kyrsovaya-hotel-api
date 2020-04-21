@@ -3,4 +3,4 @@ SECURITY_ALERT_ENABLED = True
 REGISTRATION_EMAIL_ENABLED = True
 JWT_SECRET_KEY = 'OsiejsS4efjWd5wdiiz4soQW25kxsWWQ'
 
-DB = "localhost:27017"
+DB = "localhost:27117"

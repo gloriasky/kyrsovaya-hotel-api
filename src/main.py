@@ -26,7 +26,23 @@ jwt = JWTManager(app)
 app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
 
 
+def validate_permission(permission):
+    users.validate_permission(get_jwt_identity(), permission)
+
+
+@app.route('/api/validate_permission')
+@jwt_required
+def val_perm():
+    try:
+        permission = request.args.get('permission')
+        validate_permission(permission)
+        return 'granted!', 200, {'Cache-Control': 'no-cache'}
+    except Exception as e:
+        return 'Denied: ' + str(e), 400
+
+
 @app.route('/welcome')
+@jwt_required
 def export():
     try:
         return {'message': 'Hello World!'}
