@@ -19,6 +19,7 @@ import time
 from datetime import datetime, timedelta
 
 import requests
+from src.hotel import hotel
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, expose_headers='Content-Disposition')
@@ -37,6 +38,14 @@ def val_perm():
         permission = request.args.get('permission')
         validate_permission(permission)
         return 'granted!', 200, {'Cache-Control': 'no-cache'}
+    except Exception as e:
+        return 'Denied: ' + str(e), 400
+
+
+@app.route('/api/rooms')
+def get_rooms():
+    try:
+        return jsonify(hotel.get_rooms())
     except Exception as e:
         return 'Denied: ' + str(e), 400
 

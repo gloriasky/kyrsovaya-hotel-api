@@ -1,13 +1,7 @@
 import string, random
 
-from pymongo import MongoClient
+from src.db_config import guests_table
 from werkzeug.security import generate_password_hash, check_password_hash
-from src.constants import DB
-
-
-client = MongoClient(DB)
-db = client["hotel"]
-table = db["guests"]
 
 
 def lowercase_login(func):
@@ -35,7 +29,7 @@ def new(login, password=None, **kwargs):
     }
     user = {**kwargs, **user}
 
-    table.insert_one(user)
+    guests_table.insert_one(user)
     print(f'User %s with password {password} was created' % login)
     return login, password
 
@@ -69,7 +63,7 @@ def generate_password(permissions):
 
 @lowercase_login
 def find(login, reset_password=False):
-    users = table.find({"login": login})
+    users = guests_table.find({"login": login})
 
     count = users.count()
     if count == 1:
@@ -81,7 +75,7 @@ def find(login, reset_password=False):
 
 
 def find_admins():
-    users = table.find({'permissions': PERMISSION_ADMIN})
+    users = guests_table.find({'permissions': PERMISSION_ADMIN})
     emails = []
     for user in users:
         emails.append(user.get('email'))
@@ -141,7 +135,7 @@ def update(login, field, value=None):
         else:
             value = re.split('\s*,\s*', value)
 
-    table.update_one({'login': login}, {"$set": {field: value}}, upsert=False)
+    guests_table.update_one({'login': login}, {"$set": {field: value}}, upsert=False)
 
     print('Field %s was updated from %s to %s for user %s' % (field, old_value, value, login))
 
@@ -165,19 +159,19 @@ def set_password(login, new_password=None):
     if new_password is None:
         user = find(login, True)
         new_password = generate_password(user.get('permissions', []))
-    table.update_one({'login': login}, {"$set": {'pswd': generate_password_hash(new_password)}}, upsert=False)
+    guests_table.update_one({'login': login}, {"$set": {'pswd': generate_password_hash(new_password)}}, upsert=False)
     print('Password for user %s was changed to %s' % (login, new_password))
     return new_password
 
 
 @lowercase_login
 def remove(login):
-    table.delete_one({'login': login})
+    guests_table.delete_one({'login': login})
     print('User %s was removed' % login)
 
 
 def get_company_operators(company):
-    users = table.find({'company': company, 'permissions': PERMISSION_OPERATOR})
+    users = guests_table.find({'company': company, 'permissions': PERMISSION_OPERATOR})
     result = []
     for user in users:
         result.append(
@@ -191,7 +185,7 @@ def user_view(user):
 
 
 def get_all():
-    users = table.find()
+    users = guests_table.find()
     result = []
     for user in users:
         result.append({key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company', 'permissions']})
@@ -199,7 +193,7 @@ def get_all():
 
 
 def get_from_company(company):
-    users = table.find({'company': company})
+    users = guests_table.find({'company': company})
     result = []
     for user in users:
         result.append({key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company', 'permissions']})
@@ -207,7 +201,7 @@ def get_from_company(company):
 
 
 def get_users_from_company(company):
-    users = table.find({'company': company})
+    users = guests_table.find({'company': company})
     result = []
     for user in users:
         result.append(user.get('email'))
