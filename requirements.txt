@@ -6,10 +6,10 @@ flask_cors
 flask_jwt_simple
 waitress
 fuzzywuzzy
-python-Levenshtein
 pandas
 tinydb
 xlsxwriter
 xlrd
 tqdm
+mysql-connector-python
 requests

@@ -1,6 +1,6 @@
 import string, random
 
-from src.db_config import guests_table
+from src.db_config import guests_table, admins_table, mysql_db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -10,6 +10,7 @@ def lowercase_login(func):
         args[0] = args[0].lower()
         args = tuple(args)
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -17,9 +18,9 @@ def lowercase_login(func):
 def new(login, password=None, **kwargs):
     login = login.lower()
 
-    password = password or generate_password(kwargs.get('permissions', []))
+    password = password or generate_password(kwargs.get('permission', []))
 
-    if find(login):
+    if find_employee(login):
         raise Exception('User %s already exists' % login)
 
     user = {
@@ -29,7 +30,29 @@ def new(login, password=None, **kwargs):
     }
     user = {**kwargs, **user}
 
-    guests_table.insert_one(user)
+    if 'position' in user:
+        mycursor = mysql_db.cursor(buffered=True)
+
+        sql = f"INSERT INTO employees (firstName, lastName, position, phone, permission, email)" \
+              f"VALUES (%s, %s, %s, %s, %s,%s)"
+        values = (
+        user['firstName'], user['lastName'], user['position', user['phone'], user['permission'], user['email']])
+        mycursor.execute(sql, values)
+
+        mysql_db.commit()
+
+        print(mycursor.rowcount, "record inserted.")
+    else:
+        mycursor = mysql_db.cursor(buffered=True)
+
+        sql = f"INSERT INTO guests (firstName, lastName, phone, email)" \
+              f"VALUES (%s, %s, %s, %s)"
+        values = (user['firstName'], user['lastName'], user['phone'], user['email'])
+        mycursor.execute(sql, values)
+
+        mysql_db.commit()
+
+        print(mycursor.rowcount, "record inserted.")
     print(f'User %s with password {password} was created' % login)
     return login, password
 
@@ -62,16 +85,24 @@ def generate_password(permissions):
 
 
 @lowercase_login
-def find(login, reset_password=False):
-    users = guests_table.find({"login": login})
+def find_employee(login, reset_password=False):
+    mycursor = mysql_db.cursor(buffered=True)
 
-    count = users.count()
-    if count == 1:
-        return users[0]
-    elif count > 0:
-        raise Exception('More than one user %s exist' % login)
-    elif reset_password and count == 0:
-        raise Exception('No such a user!')
+    mycursor.execute(f"SELECT * FROM employees WHERE email = '{login}'")
+
+    user = mycursor.fetchall()[0]
+    print(user)
+    _dict = {
+        '_id': user[0],
+        'firstName': user[1],
+        'lastName': user[2],
+        'position': user[3],
+        'phone': user[4],
+        'permission': user[5],
+        'email': login
+    }
+    mycursor.close()
+    return _dict
 
 
 def find_admins():
@@ -83,8 +114,23 @@ def find_admins():
 
 
 @lowercase_login
-def validate(login, password):
-    user = find(login)
+def validate_employee(login, password):
+    user = find_employee(login)
+
+    sql_query = 'select employees.email, employees_passwords.password_hash ' \
+                'from employees_passwords ' \
+                'inner join employees ' \
+                'on employees._id = employees_passwords._id ' \
+                f'where employees.email = "{login}"'
+    mycursor = mysql_db.cursor(buffered=True)
+
+    mycursor.execute(sql_query)
+
+    user['pswd'] = mycursor.fetchall()[0][1]
+    mycursor.close()
+
+    print(generate_password_hash(password))
+
     if not user:
         raise Exception('User %s not found' % login)
     elif not check_password_hash(user['pswd'], password):
@@ -92,65 +138,12 @@ def validate(login, password):
     return user
 
 
-def field_beautify(field):
-    if field == 'firstName':
-        return 'first name'
-    elif field == 'lastName':
-        return 'last name'
-    else:
-        return field
-
-
-def permissions_beautify(permissions):
-    if permissions is None:
-        return 'Regular user'
-    elif len(permissions) == 0:
-        return 'Regular user'
-    else:
-        perm = []
-        if 'operator' in permissions:
-            perm.append('Nominated Contact Person')
-        if 'admin' in permissions:
-            perm.append('System Administrator from Operator')
-        if 'view' in permissions:
-            perm.append('Read only')
-        if 'superadmin' in permissions:
-            perm.append('Super Administrator')
-        return ', '.join(perm)
-
-
-@lowercase_login
-def update(login, field, value=None):
-    user = find(login)
-    if not user:
-        raise Exception('User %s not found' % login)
-    if field not in FIELDS_TO_UPDATE:
-        raise Exception('Unsupported field. Use one of these: %s.' % ', '.join(FIELDS_TO_UPDATE))
-
-    old_value = user.get(field)
-
-    if field == 'permissions' and value is not None:
-        if value == '':
-            value = []
-        else:
-            value = re.split('\s*,\s*', value)
-
-    guests_table.update_one({'login': login}, {"$set": {field: value}}, upsert=False)
-
-    print('Field %s was updated from %s to %s for user %s' % (field, old_value, value, login))
-
-    if field == 'permissions':
-        return {'field': field_beautify(field), 'old_value': permissions_beautify(old_value), 'new_value': permissions_beautify(value)}
-    else:
-        return {'field': field_beautify(field), 'old_value': old_value, 'new_value': value}
-
-
 @lowercase_login
 def validate_permission(login, permission):
-    user = find(login)
+    user = find_employee(login)
     if not user:
         raise Exception('User %s not found' % login)
-    elif permission not in user.get('permissions', []):
+    elif permission != user.get('permission'):
         raise Exception('No permissions')
 
 
@@ -170,15 +163,6 @@ def remove(login):
     print('User %s was removed' % login)
 
 
-def get_company_operators(company):
-    users = guests_table.find({'company': company, 'permissions': PERMISSION_OPERATOR})
-    result = []
-    for user in users:
-        result.append(
-            {key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company']})
-    return result
-
-
 def user_view(user):
     result = {key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone']}
     return result
@@ -188,39 +172,6 @@ def get_all():
     users = guests_table.find()
     result = []
     for user in users:
-        result.append({key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company', 'permissions']})
+        result.append(
+            {key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company', 'permissions']})
     return result
-
-
-def get_from_company(company):
-    users = guests_table.find({'company': company})
-    result = []
-    for user in users:
-        result.append({key: user.get(key) for key in ['email', 'firstName', 'lastName', 'phone', 'company', 'permissions']})
-    return result
-
-
-def get_users_from_company(company):
-    users = guests_table.find({'company': company})
-    result = []
-    for user in users:
-        result.append(user.get('email'))
-    return result
-
-
-def update_full(user):
-    old_user = find(user['email'])
-    updated = []
-    for key in user:
-        if key not in old_user:
-            if key == 'permissions':
-                updated.append(update(user['email'], key, ','.join(user[key])))
-            else:
-                updated.append(update(user['email'], key, user[key]))
-        elif old_user[key] != user[key]:
-            if key == 'permissions':
-                updated.append(update(user['email'], key, ','.join(user[key])))
-            else:
-                updated.append(update(user['email'], key, user[key]))
-    return updated
-
