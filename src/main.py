@@ -59,6 +59,16 @@ def get_services():
         return 'Denied: ' + str(e), 400
 
 
+@app.route('/api/employees')
+@jwt_required
+def get_employees():
+    try:
+        validate_permission('admin')
+        return jsonify(users.get_all_employees())
+    except Exception as e:
+        return 'Denied: ' + str(e), 400
+
+
 @app.route('/welcome')
 @jwt_required
 def export():
@@ -252,6 +262,66 @@ def update_service():
         _id: str = request.args.get('id')
 
         hotel.update_service(_id, json)
+        return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/add/employee', methods=['POST'])
+@jwt_required
+def create_employee():
+    try:
+        print('Adding new employee...')
+        validate_permission('admin')
+        json = request.json
+
+        users.add_employee(json)
+        return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/delete/employee')
+@jwt_required
+def delete_employee():
+    try:
+        print('Deleting employee...')
+        validate_permission('admin')
+        _id = request.args.get('_id')
+
+        users.delete_employee(_id)
+        return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/get/employee')
+@jwt_required
+def get_employee():
+    try:
+        print('Getting employee info...')
+
+        _id: str = request.args.get('id')
+        employee: dict = users.get_employee(_id)
+        return employee, 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/update/employee', methods=['POST'])
+@jwt_required
+def update_employee():
+    try:
+        print('Adding new room...')
+        validate_permission('admin')
+        json: dict = request.json
+        _id: str = request.args.get('id')
+
+        users.update_employee(_id, json)
         return 'Success', 200
     except Exception as e:
         print(str(e))
