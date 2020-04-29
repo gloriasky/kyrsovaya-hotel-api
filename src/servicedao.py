@@ -63,7 +63,7 @@ def update_service(_id: str, service: dict):
         if service[key] != old_service[key]:
             mycursor = mysql_db.cursor()
 
-            sql = f"UPDATE services SET {key} = {service[key]} WHERE _id = {_id}"
+            sql = f"UPDATE services SET {key} = '{service[key]}' WHERE _id = {_id}"
 
             mycursor.execute(sql)
 

@@ -61,7 +61,7 @@ def update_room(_id: str, room):
             print(room[key])
             mycursor = mysql_db.cursor()
 
-            sql = f"UPDATE rooms SET {key} = {room[key]} WHERE _id = {_id}"
+            sql = f"UPDATE rooms SET {key} = '{room[key]}' WHERE _id = {_id}"
 
             mycursor.execute(sql)
 
