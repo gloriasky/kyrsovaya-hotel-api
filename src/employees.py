@@ -7,7 +7,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 def find_employee(login: str):
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(f"SELECT * FROM employees WHERE email = '{login}'")
 
@@ -26,6 +27,7 @@ def find_employee(login: str):
         'dateOfBirth': str(user[7].strftime("%Y-%m-%d"))
     }
     mycursor.close()
+    db.close()
     return _dict
 
 
