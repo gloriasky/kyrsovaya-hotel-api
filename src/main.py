@@ -7,7 +7,8 @@ from flask_jwt_simple import (
 
 from waitress import serve
 
-from src import employees as users
+from src import employees
+from src import guests
 from src.constants import *
 
 import os, os.path, tempfile
@@ -28,7 +29,9 @@ app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
 
 
 def validate_permission(permission):
-    users.validate_permission(get_jwt_identity(), permission)
+    if not employees.find_employee(get_jwt_identity()):
+        raise Exception('Don\'t have permissions')
+    employees.validate_permission(get_jwt_identity(), permission)
 
 
 @app.route('/api/validate_permission')
@@ -53,8 +56,8 @@ def get_rooms():
 @app.route('/api/services')
 def get_services():
     try:
-        filter = request.args.get('filter')
-        return jsonify(hotel.get_services(filter))
+        _filter = request.args.get('filter')
+        return jsonify(hotel.get_services(_filter))
     except Exception as e:
         return 'Denied: ' + str(e), 400
 
@@ -64,7 +67,17 @@ def get_services():
 def get_employees():
     try:
         validate_permission('admin')
-        return jsonify(users.get_all_employees())
+        return jsonify(employees.get_all_employees())
+    except Exception as e:
+        return 'Denied: ' + str(e), 400
+
+
+@app.route('/api/guests')
+@jwt_required
+def get_guests():
+    try:
+        validate_permission('admin')
+        return jsonify(guests.get_all_guests())
     except Exception as e:
         return 'Denied: ' + str(e), 400
 
@@ -82,8 +95,14 @@ def export():
 def login():
     try:
         data = request.json
-        user = users.validate_password(data['login'].lower(), data['password'])
-        user_view = users.user_view(user)
+        if employees.find_employee(data['login']):
+            user = employees.validate_password(data['login'].lower(), data['password'])
+            user_view = employees.user_view(user)
+        elif guests.find_guest(data['login']):
+            user = guests.validate_password(data['login'].lower(), data['password'])
+            user_view = guests.user_view(user)
+        else:
+            raise Exception('Such user do not exist!')
         data = {'jwt': create_jwt(identity=data['login'].lower()), 'user': user_view}
         if SECURITY_ALERT_ENABLED:
             # security_alert(get_user_ip(), login)
@@ -102,9 +121,8 @@ def login():
 def create_user():
     try:
         json = request.json
-        json['permissions'] = ['guest']
 
-        login, password = users.new(json['email'], **json)
+        login, password = guests.add_guest(json)
 
         if REGISTRATION_EMAIL_ENABLED:
             print('Sending email')
@@ -276,7 +294,7 @@ def create_employee():
         validate_permission('admin')
         json = request.json
 
-        users.add_employee(json)
+        employees.add_employee(json)
         return 'Success', 200
     except Exception as e:
         print(str(e))
@@ -291,7 +309,7 @@ def delete_employee():
         validate_permission('admin')
         _id = request.args.get('_id')
 
-        users.delete_employee(_id)
+        employees.delete_employee(_id)
         return 'Success', 200
     except Exception as e:
         print(str(e))
@@ -305,7 +323,7 @@ def get_employee():
         print('Getting employee info...')
 
         _id: str = request.args.get('id')
-        employee: dict = users.get_employee(_id)
+        employee: dict = employees.get_employee(_id)
         return employee, 200
     except Exception as e:
         print(str(e))
@@ -321,7 +339,7 @@ def update_employee():
         json: dict = request.json
         _id: str = request.args.get('id')
 
-        users.update_employee(_id, json)
+        employees.update_employee(_id, json)
         return 'Success', 200
     except Exception as e:
         print(str(e))
