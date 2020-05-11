@@ -7,7 +7,7 @@ from flask_jwt_simple import (
 
 from waitress import serve
 
-from src import employees
+from src import employees, bookings
 from src import guests
 from src.constants import *
 
@@ -49,6 +49,15 @@ def val_perm():
 def get_rooms():
     try:
         return jsonify(hotel.get_rooms())
+    except Exception as e:
+        return 'Denied: ' + str(e), 400
+
+
+@app.route('/api/rooms/available', methods=['POST'])
+def get_available_rooms():
+    try:
+        json = request.json
+        return jsonify(hotel.get_available_rooms(json['capacity'], json['dateFrom'], json['dateTo']))
     except Exception as e:
         return 'Denied: ' + str(e), 400
 
@@ -236,6 +245,81 @@ def create_service():
 
         hotel.add_service(json)
         return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/save/booking', methods=['POST'])
+@jwt_required
+def save_booking():
+    try:
+        print('Adding new service...')
+        user = guests.find_guest(get_jwt_identity())
+        print(user)
+        if not user:
+            raise Exception("Employees are not allowed to book rooms!")
+        json = request.json
+        json['guestId'] = user['_id']
+
+        bookings.save_booking(json)
+        return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/user/bookings')
+@jwt_required
+def get_user_bookings():
+    try:
+        print('Adding new service...')
+        user = employees.find_employee(get_jwt_identity())
+        if not user:
+            user = guests.find_guest(get_jwt_identity())
+
+        _bookings = bookings.get_user_bookings(user['_id'])
+        return jsonify(_bookings), 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/update/booking', methods=['POST'])
+@jwt_required
+def update_booking():
+    try:
+        print('Adding new service...')
+        json = request.json
+
+        bookings.update_booking(json)
+        return 'Success', 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/user/booking')
+@jwt_required
+def get_user_booking():
+    try:
+        print('Adding new service...')
+        _id = request.args.get('id')
+
+        _bookings = bookings.get_user_booking(_id)
+        return jsonify(_bookings), 200
+    except Exception as e:
+        print(str(e))
+        return 'Failed to create room: ' + str(e), 400
+
+
+@app.route('/api/bookings')
+@jwt_required
+def get_all_bookings():
+    try:
+        validate_permission('admin')
+        _bookings = bookings.get_all_bookings()
+        return jsonify(_bookings), 200
     except Exception as e:
         print(str(e))
         return 'Failed to create room: ' + str(e), 400

@@ -1,4 +1,4 @@
-from src.roomdao import get_all_rooms, add_room, update_room, get_room_info, delete_room
+from src.roomdao import get_all_rooms, add_room, update_room, get_room_info, delete_room, get_available_rooms
 from src.servicedao import get_all_services, add_service, update_service, get_service_info, delete_service
 
 
@@ -27,6 +27,9 @@ class Hotel ():
 
     def get_service(self, _id: str):
         return get_service_info(_id)
+
+    def get_available_rooms(self, capacity, date_from, date_to):
+        return get_available_rooms(capacity, date_from, date_to)
 
     def update_service(self, _id: str, service: dict):
         update_service(_id, service)
