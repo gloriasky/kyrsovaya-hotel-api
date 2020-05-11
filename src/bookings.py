@@ -10,7 +10,7 @@ table = db['bookings']
 
 
 def save_booking(booking: dict):
-    booking['status'] = 'booked'
+    booking['status'] = 'Booked'
     table.insert_one(booking)
 
 
