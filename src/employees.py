@@ -2,7 +2,7 @@ from datetime import datetime
 import random
 import string
 
-from src.db_config import mysql_db, init_db
+from src.db_config import init_db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -54,17 +54,19 @@ def user_view(user):
 
 def validate_password(login, password):
     user = find_employee(login)
+    db = init_db()
     sql_query = 'select employees.email, employees_passwords.password_hash ' \
                 'from employees_passwords ' \
                 'inner join employees ' \
                 'on employees._id = employees_passwords._id ' \
                 f'where employees.email = "{login}"'
-    mycursor = mysql_db.cursor(buffered=True)
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(sql_query)
 
     user['pswd'] = mycursor.fetchall()[0][1]
     mycursor.close()
+    db.close()
 
     if not user:
         raise Exception('User %s not found' % login)
@@ -78,7 +80,8 @@ def add_employee(employee: dict):
     if find_employee(employee['email']):
         raise Exception('User %s already exists' % employee['email'])
 
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = "INSERT INTO employees (firstName, lastName, position, phone, permission, email, dateOfBirth)" \
           "VALUES (%s, %s, %s, %s, %s,%s, %s)"
@@ -87,9 +90,11 @@ def add_employee(employee: dict):
     mycursor.execute(sql, values)
     _id = mycursor.lastrowid
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record inserted.")
+
+    db.close()
 
     if employee['createPassword']:
         save_password(_id)
@@ -119,12 +124,13 @@ def create_password():
 
 
 def get_all_employees():
+    db = init_db()
     sql_query = 'select employees._id, employees.email, employees.firstName, employees.lastName, ' \
                 'employees.phone, employees.position, employees.dateOfBirth, employees_passwords.password_hash ' \
                 'from employees_passwords ' \
                 'right join employees ' \
                 'on employees._id = employees_passwords.employee_id '
-    mycursor = mysql_db.cursor(buffered=True)
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(sql_query)
 
@@ -144,11 +150,13 @@ def get_all_employees():
         }
         result.append(_dict)
     mycursor.close()
+    db.close()
     return result
 
 
 def get_employee(_id):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     mycursor.execute(f"SELECT * FROM employees WHERE _id = {_id}")
 
@@ -164,16 +172,18 @@ def get_employee(_id):
         'dateOfBirth': str(employee[7].strftime("%Y-%m-%d"))
     }
     mycursor.close()
+    db.close()
     return _dict
 
 
 def get_password(_id):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     mycursor.execute(f"SELECT * FROM employees_passwords WHERE employee_id = {_id}")
 
     employee = mycursor.fetchall()
-    print(employee)
+    db.close()
     if len(employee) > 0:
         return True
 
@@ -181,29 +191,34 @@ def get_password(_id):
 def save_password(_id):
     password = create_password()
     hash = generate_password_hash(password)
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = "INSERT INTO employees_passwords (employee_id, password_hash)" \
           "VALUES (%s, %s)"
     values = (_id, hash)
     mycursor.execute(sql, values)
 
-    mysql_db.commit()
+    db.commit()
 
     print(password)
 
     print(mycursor.rowcount, "record inserted.")
 
+    mycursor.close()
+    db.close()
+
 
 def update_password(_id):
     password = create_password()
     hash = generate_password_hash(password)
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = f"UPDATE employees_passwords SET password_hash = '{hash}' WHERE employee_id = {_id}"
     mycursor.execute(sql)
 
-    mysql_db.commit()
+    db.commit()
 
     print(password)
 
@@ -213,18 +228,20 @@ def update_password(_id):
 def update_employee(_id: str, employee: dict):
     old_employee = get_employee(_id)
     print(employee)
+    db = init_db()
     for key in employee:
         if key != 'createPassword' and employee[key] != old_employee[key]:
-            mycursor = mysql_db.cursor()
+            mycursor = db.cursor()
 
             sql = f"UPDATE employees SET {key} = '{employee[key]}' WHERE _id = {_id}"
 
             mycursor.execute(sql)
 
-            mysql_db.commit()
+            db.commit()
 
             print(mycursor.rowcount, "record(s) affected")
             mycursor.close()
+    db.close()
     if employee['createPassword']:
         if get_password(_id):
             update_password(_id)
@@ -233,13 +250,14 @@ def update_employee(_id: str, employee: dict):
 
 
 def delete_employee(_id: str):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     sql = f"DELETE FROM employees WHERE _id = {_id}"
 
     mycursor.execute(sql)
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record(s) deleted")
     mycursor.close()

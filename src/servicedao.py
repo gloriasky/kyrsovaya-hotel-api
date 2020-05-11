@@ -1,22 +1,25 @@
-from src.db_config import mysql_db
+from src.db_config import init_db
 
 
 def add_service(service: dict):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     sql = f"INSERT INTO services (section, name, price, status) " \
           f"VALUES (%s, %s, %s, %s)"
     values = (service['section'], service['name'], service['price'], service['status'])
     mycursor.execute(sql, values)
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record inserted.")
     mycursor.close()
+    db.close()
 
 
 def get_all_services(filter: str):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     if filter == 'all':
         sql = "SELECT * FROM services"
@@ -37,11 +40,13 @@ def get_all_services(filter: str):
         }
         result.append(_dict)
     mycursor.close()
+    db.close()
     return result
 
 
 def get_service_info(_id: str):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     mycursor.execute(f"SELECT * FROM services WHERE _id = {_id}")
 
@@ -54,36 +59,42 @@ def get_service_info(_id: str):
         'status': service[4]
     }
     mycursor.close()
+    db.close()
     return _dict
 
 
 def update_service(_id: str, service: dict):
     old_service = get_service_info(_id)
+    db = init_db()
     for key in service:
         if service[key] != old_service[key]:
-            mycursor = mysql_db.cursor()
+            mycursor = db.cursor()
 
             sql = f"UPDATE services SET {key} = '{service[key]}' WHERE _id = {_id}"
 
             mycursor.execute(sql)
 
-            mysql_db.commit()
+            db.commit()
 
             print(mycursor.rowcount, "record(s) affected")
             mycursor.close()
 
+    db.close()
+
 
 def delete_service(_id: str):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     sql = f"DELETE FROM services WHERE _id = {_id}"
 
     mycursor.execute(sql)
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record(s) deleted")
     mycursor.close()
+    db.close()
 
 
 

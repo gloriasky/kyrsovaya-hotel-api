@@ -1,12 +1,13 @@
 import random
 import string
 
-from src.db_config import mysql_db, init_db
+from src.db_config import init_db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
 def find_guest(login: str):
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(f"SELECT * FROM guests WHERE email = '{login}'")
 
@@ -23,6 +24,7 @@ def find_guest(login: str):
         'numOfArrivals': user[5]
     }
     mycursor.close()
+    db.close()
     return _dict
 
 
@@ -32,18 +34,20 @@ def user_view(user):
 
 
 def validate_password(login, password):
+    db = init_db()
     user = find_guest(login)
     sql_query = 'select guests.email, guests_passwords.password_hash ' \
                 'from guests_passwords ' \
                 'inner join guests ' \
                 'on guests._id = guests_passwords._id ' \
                 f'where guests.email = "{login}"'
-    mycursor = mysql_db.cursor(buffered=True)
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(sql_query)
 
     user['pswd'] = mycursor.fetchall()[0][1]
     mycursor.close()
+    db.close()
 
     if not user:
         raise Exception('User %s not found' % login)
@@ -60,7 +64,8 @@ def add_guest(guest: dict):
     if 'phone' not in guest:
         guest['phone'] = None
 
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = "INSERT INTO guests (firstName, lastName, phone, email)" \
           "VALUES (%s, %s, %s, %s)"
@@ -69,16 +74,18 @@ def add_guest(guest: dict):
     mycursor.execute(sql, values)
     _id = mycursor.lastrowid
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record inserted.")
+    db.close()
     save_password(_id, guest['password'])
 
 
 def get_all_guests():
     sql_query = 'select guests._id, guests.email, guests.firstName, guests.lastName, guests.phone, guests.numOfArrivals ' \
                 'from guests '
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     mycursor.execute(sql_query)
 
@@ -95,11 +102,13 @@ def get_all_guests():
         }
         result.append(_dict)
     mycursor.close()
+    db.close()
     return result
 
 
 def get_guest(_id):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     mycursor.execute(f"SELECT * FROM guests WHERE _id = {_id}")
 
@@ -113,73 +122,85 @@ def get_guest(_id):
         'numOfArrivals': user[5]
     }
     mycursor.close()
+    db.close()
     return _dict
 
 
 def get_password(_id):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     mycursor.execute(f"SELECT * FROM guests_passwords WHERE guest_id = {_id}")
 
     guest = mycursor.fetchall()
+    db.close()
     if len(guest) > 0:
         return True
 
 
 def save_password(_id, password):
     hash = generate_password_hash(password)
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = "INSERT INTO guests_passwords (guest_id, password_hash)" \
           "VALUES (%s, %s)"
     values = (_id, hash)
     mycursor.execute(sql, values)
 
-    mysql_db.commit()
+    db.commit()
 
     print(password)
 
     print(mycursor.rowcount, "record inserted.")
+    db.close()
 
 
 def update_password(_id, password):
     hash = generate_password_hash(password)
-    mycursor = mysql_db.cursor(buffered=True)
+    db = init_db()
+    mycursor = db.cursor(buffered=True)
 
     sql = f"UPDATE guests_passwords SET password_hash = '{hash}' WHERE guest_id = {_id}"
     mycursor.execute(sql)
 
-    mysql_db.commit()
+    db.commit()
 
     print(password)
 
     print(mycursor.rowcount, "record inserted.")
+    db.close()
 
 
 def update_guest(_id: str, guest: dict):
     old_guest = get_guest(_id)
+    db = init_db()
     for key in guest:
         if guest[key] != old_guest[key]:
-            mycursor = mysql_db.cursor()
+            mycursor = db.cursor()
 
             sql = f"UPDATE guests SET {key} = '{guest[key]}' WHERE _id = {_id}"
 
             mycursor.execute(sql)
 
-            mysql_db.commit()
+            db.commit()
 
             print(mycursor.rowcount, "record(s) affected")
             mycursor.close()
 
+    db.close()
+
 
 def delete_guest(_id: str):
-    mycursor = mysql_db.cursor()
+    db = init_db()
+    mycursor = db.cursor()
 
     sql = f"DELETE FROM guests WHERE _id = {_id}"
 
     mycursor.execute(sql)
 
-    mysql_db.commit()
+    db.commit()
 
     print(mycursor.rowcount, "record(s) deleted")
     mycursor.close()
+    db.close()
